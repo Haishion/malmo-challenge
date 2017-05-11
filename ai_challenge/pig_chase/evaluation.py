@@ -89,20 +89,22 @@ class PigChaseEvaluator(object):
                                   role=1, randomize_positions=True)
         print('==================================')
         print('Starting evaluation of Agent @100k')
+        run_times = 100
 
         p = Process(target=run_challenge_agent, args=(self._clients,))
         p.start()
         sleep(5)
-        agent_loop(self._agent_100k, env, self._accumulators['100k'])
+        agent_loop(self._agent_100k, env, self._accumulators['100k'], run_times)
         p.terminate()
 
         print('==================================')
         print('Starting evaluation of Agent @500k')
+        run_times = 500
 
         p = Process(target=run_challenge_agent, args=(self._clients,))
         p.start()
         sleep(5)
-        agent_loop(self._agent_500k, env, self._accumulators['500k'])
+        agent_loop(self._agent_500k, env, self._accumulators['500k'], run_times)
         p.terminate()
 
 
@@ -111,20 +113,26 @@ def run_challenge_agent(clients):
     env = PigChaseEnvironment(clients, builder, role=0,
                               randomize_positions=True)
     agent = PigChaseChallengeAgent(ENV_AGENT_NAMES[0])
-    agent_loop(agent, env, None)
+    agent_loop(agent, env, None, None)
 
 
-def agent_loop(agent, env, metrics_acc):
-    EVAL_EPISODES = 100
+def agent_loop(agent, env, metrics_acc, run_times):
+    EVAL_EPISODES = 500
+    if run_times is None:
+        run_times = EVAL_EPISODES
     agent_done = False
     reward = 0
+    reward_sum = 0
     episode = 0
     obs = env.reset()
 
-    while episode < EVAL_EPISODES:
+    while episode < run_times:
         # check if env needs reset
         if env.done:
-            print('Episode %d (%.2f)%%' % (episode, (episode / EVAL_EPISODES) * 100.))
+            print('Episode %d (%.2f)%%' % (episode+1, (episode + 1) * 100. / EVAL_EPISODES))
+            
+            if metrics_acc is not None:
+                metrics_acc.append(reward_sum)
 
             obs = env.reset()
             while obs is None:
@@ -139,6 +147,7 @@ def agent_loop(agent, env, metrics_acc):
         action = agent.act(obs, reward, agent_done, is_training=True)
         # take a step
         obs, reward, agent_done = env.do(action)
+        # record the total reward for an episode
+        reward_sum += reward
 
-        if metrics_acc is not None:
-            metrics_acc.append(reward)
+
